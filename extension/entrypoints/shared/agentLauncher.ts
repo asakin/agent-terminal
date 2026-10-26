@@ -6,12 +6,13 @@ const LAST_APP_KEY = "agent-terminal.lastApp";
 const SHELL_ID = "";
 
 /** Product agents in display order (only shown when present in apps/). */
-const PRODUCT_ORDER = ["claude", "codex", "cursor-agent", "hermes", "openclaw"] as const;
+const PRODUCT_ORDER = ["claude", "codex", "cursor-agent", "goose", "hermes", "openclaw"] as const;
 
 const LABELS: Record<string, string> = {
     claude: "Claude",
     codex: "Codex",
     "cursor-agent": "Cursor",
+    goose: "Goose",
     hermes: "Hermes",
     openclaw: "OpenClaw",
 };

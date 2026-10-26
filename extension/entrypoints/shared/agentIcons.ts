@@ -36,6 +36,19 @@ function monoMark(viewBox: string, inner: string): string {
     );
 }
 
+/** Site favicon, kept as the PNG the product publishes. */
+function faviconSVG(size: number, pngBase64: string): string {
+    return (
+        `<svg viewBox="0 0 ${size} ${size}" width="16" height="16" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
+        `<image href="data:image/png;base64,${pngBase64}" width="${size}" height="${size}"/>` +
+        `</svg>`
+    );
+}
+
+/** https://goose-docs.ai/img/favicon.ico */
+const GOOSE_FAVICON =
+    "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";
+
 /** Colored SVG markup for a launcher id (`""` = shell). */
 export function agentIconSVG(id: string): string {
     switch (id) {
@@ -54,6 +67,8 @@ export function agentIconSVG(id: string): string {
                 `</linearGradient></defs>`,
             );
         }
+        case "goose":
+            return faviconSVG(40, GOOSE_FAVICON);
         case "cursor-agent":
             return monoMark(
                 "0 0 466.73 532.09",
