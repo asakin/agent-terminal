@@ -129,6 +129,7 @@ func runDoctor(fix bool) (*DoctorStatus, error) {
 		{"codex", "codex"},
 		{"cursor-agent", "cursor-agent"},
 		{"goose", "goose"},
+		{"pi", "pi"},
 		{"hermes", "hermes"},
 		{"openclaw", "openclaw"},
 		{"agent-browser", "agent-browser"},

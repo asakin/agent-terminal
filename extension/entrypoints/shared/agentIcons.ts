@@ -69,6 +69,15 @@ export function agentIconSVG(id: string): string {
         }
         case "goose":
             return faviconSVG(40, GOOSE_FAVICON);
+        case "pi":
+            return (
+                `<svg viewBox="0 0 560 560" width="16" height="16" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
+                `<style>.at-pi-mark{fill:#111111}@media (prefers-color-scheme:dark){.at-pi-mark{fill:#f6f6f6}}</style>` +
+                `<path class="at-pi-mark" d="M420 280H280V140H0V0H420V280Z"/>` +
+                `<path class="at-pi-mark" d="M560 560H420V280H560V560Z"/>` +
+                `<path class="at-pi-mark" d="M140 560H0V140H140V280H280V420H140V560Z"/>` +
+                `</svg>`
+            );
         case "cursor-agent":
             return monoMark(
                 "0 0 466.73 532.09",
