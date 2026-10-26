@@ -124,38 +124,51 @@ func runDoctor(fix bool) (*DoctorStatus, error) {
 		}
 	}
 
-	agents := []struct{ name, bin string }{
-		{"claude", "claude"},
-		{"codex", "codex"},
-		{"cursor-agent", "cursor-agent"},
-		{"goose", "goose"},
-		{"pi", "pi"},
-		{"opencode", "opencode"},
-		{"hermes", "hermes"},
-		{"openclaw", "openclaw"},
-		{"agent-browser", "agent-browser"},
-	}
 	foundAgents := []string{}
-	for _, a := range agents {
-		path, err := exec.LookPath(a.bin)
-		if a.name == "agent-browser" && realAgentBrowser != "" {
-			path = realAgentBrowser
-			err = nil
+	if realAgentBrowser != "" {
+		foundAgents = append(foundAgents, "agent-browser")
+		status.Checks = append(status.Checks, DoctorCheck{
+			ID:     "cli:agent-browser",
+			Label:  "agent-browser",
+			Status: "ok",
+			Detail: realAgentBrowser,
+		})
+	}
+	if path, err := exec.LookPath("codex"); err == nil {
+		foundAgents = append(foundAgents, "codex")
+		status.Checks = append(status.Checks, DoctorCheck{
+			ID:     "cli:codex",
+			Label:  "codex",
+			Status: "ok",
+			Detail: path,
+		})
+	}
+
+	appNames, err := listAppNames()
+	if err != nil {
+		return nil, err
+	}
+	for _, name := range appNames {
+		if name == "agent-browser" {
+			continue
 		}
-		if err != nil || path == "" {
+		path, lookErr := exec.LookPath(name)
+		if lookErr != nil || path == "" {
 			status.Checks = append(status.Checks, DoctorCheck{
-				ID:      "cli:" + a.name,
-				Label:   a.bin,
-				Status:  "info",
-				Detail:  "Not found on PATH",
-				FixHint: fmt.Sprintf("Install %s and ensure it is on PATH", a.bin),
+				ID:      "app:" + name,
+				Label:   name,
+				Status:  "warn",
+				Detail:  "Launcher script exists; binary is not on PATH",
+				FixHint: "Install " + name + ", or remove " + filepath.Join(appDir, name),
 			})
 			continue
 		}
-		foundAgents = append(foundAgents, a.name)
+		if !foundAgent(foundAgents, name) {
+			foundAgents = append(foundAgents, name)
+		}
 		status.Checks = append(status.Checks, DoctorCheck{
-			ID:     "cli:" + a.name,
-			Label:  a.bin,
+			ID:     "app:" + name,
+			Label:  name,
 			Status: "ok",
 			Detail: path,
 		})

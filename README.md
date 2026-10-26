@@ -28,7 +28,7 @@ This extension lets coding agents drive the page you’re looking at: open, clic
 | --------------------------- | ------------------------------------------------ | ------------------------------------------ |
 | Interactive browser + agent | Side panel interaction next to live browser tabs | Easy to spawn invisible tabs you never see |
 | You stay in the loop        | Same window (watch the agent, take over anytime) | Automation often runs off-screen           |
-| One-click agents            | Claude / Codex / Cursor / Goose / Pi / OpenCode / Hermes / OpenClaw | Manual shells and PATH |
+| One-click agents            | Scripts in ~/.config/agent-terminal/apps. Add one with `agent-terminal app add <name>`. | Manual shells and PATH |
 
 
 ## Quick start
@@ -62,7 +62,7 @@ Because it is just a terminal, you can use any browser automation you prefer: [a
 
 - **Browse freely:** while your agent browses the web, you can browse other tabs. No need to keep the agent’s working tab in focus.
 - **Tabs:** up to 8 terminals per Chrome window
-- **One-Click Agent Launcher:** `+` runs your last agent; dropdown menu for Claude, Codex, Cursor, Hermes, OpenClaw, or Terminal
+- **One-Click Agent Launcher:** `+` runs your last agent. The menu lists launcher scripts under `~/.config/agent-terminal/apps`, then Terminal. `agent-terminal app add <name>` writes a script when `<name>` is on `PATH`.
 - **Settings:** shell, theme, font size, env, and Run doctor in Chrome extension options
 
 Terminal editing follows VS Code/Cursor conventions. Shift+Enter inserts a newline in
