@@ -2,6 +2,7 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { WebLinksAddon } from "@xterm/addon-web-links";
+import { bindKeySequences } from "./terminalKeys";
 import {
     RequestCreateTTY,
     RequestGetXtermConfig,
@@ -189,6 +190,7 @@ async function main() {
     let ptyAttach: PtyAttachHandle | null = null;
 
     const terminal = new Terminal(xtermResp.result);
+    bindKeySequences(terminal);
     const fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
     terminal.loadAddon(new WebLinksAddon());
@@ -529,6 +531,7 @@ async function runSingleTerminal(
 ) {
     let activeTtyId = tty.id;
     const terminal = new Terminal(xtermConfig);
+    bindKeySequences(terminal);
     const fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
     terminal.loadAddon(new WebLinksAddon());
