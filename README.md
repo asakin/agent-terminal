@@ -28,7 +28,7 @@ This extension lets coding agents drive the page you’re looking at: open, clic
 | --------------------------- | ------------------------------------------------ | ------------------------------------------ |
 | Interactive browser + agent | Side panel interaction next to live browser tabs | Easy to spawn invisible tabs you never see |
 | You stay in the loop        | Same window (watch the agent, take over anytime) | Automation often runs off-screen           |
-| One-click agents            | Claude / Codex / Cursor / Goose / Pi / Hermes / OpenClaw | Manual shells and PATH              |
+| One-click agents            | Claude / Codex / Cursor / Goose / Pi / OpenCode / Hermes / OpenClaw | Manual shells and PATH |
 
 
 ## Quick start

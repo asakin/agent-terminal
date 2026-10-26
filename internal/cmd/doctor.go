@@ -130,6 +130,7 @@ func runDoctor(fix bool) (*DoctorStatus, error) {
 		{"cursor-agent", "cursor-agent"},
 		{"goose", "goose"},
 		{"pi", "pi"},
+		{"opencode", "opencode"},
 		{"hermes", "hermes"},
 		{"openclaw", "openclaw"},
 		{"agent-browser", "agent-browser"},
