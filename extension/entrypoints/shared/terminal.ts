@@ -3,7 +3,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { bindKeySequences } from "./terminalKeys";
-import {
+import type {
     RequestCreateTTY,
     RequestGetXtermConfig,
     RequestResizeTTY,
@@ -12,14 +12,14 @@ import {
 } from "./rpc";
 import { renderSetupScreen } from "./setup";
 import {
-    LauncherController,
+    type LauncherController,
     mountAgentLauncher,
     optsFromAppId,
 } from "./agentLauncher";
-import { PtyAttachHandle, attachPtySocket } from "./ptyAttach";
+import { type PtyAttachHandle, attachPtySocket } from "./ptyAttach";
 import {
     MAX_TABS,
-    WindowTabState,
+    type WindowTabState,
     attachTTY,
     clearWindowState,
     createTTY,

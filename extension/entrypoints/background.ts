@@ -1,6 +1,6 @@
-import { JSONRPCResponse, RequestDestroyTTY } from "~/entrypoints/shared/rpc"
+import type { JSONRPCResponse, RequestDestroyTTY } from "~/entrypoints/shared/rpc"
 import {
-  WindowTabState,
+  type WindowTabState,
   legacySessionKey,
   windowStateKey,
 } from "~/entrypoints/shared/windowTabs"
