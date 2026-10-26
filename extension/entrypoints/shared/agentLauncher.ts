@@ -1,6 +1,6 @@
 import { agentIconSVG } from "./agentIcons";
-import { RequestConfigGet, ResponseConfigGet } from "./rpc";
-import { CreateTTYOpts } from "./windowTabs";
+import type { RequestConfigGet, ResponseConfigGet } from "./rpc";
+import type { CreateTTYOpts } from "./windowTabs";
 
 const LAST_APP_KEY = "agent-terminal.lastApp";
 const SHELL_ID = "";
