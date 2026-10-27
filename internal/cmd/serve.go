@@ -250,20 +250,20 @@ func NewCmdServe() *cobra.Command {
 			defer logFile.Close()
 			logger := slog.New(slog.NewTextHandler(logFile, &slog.HandlerOptions{}))
 
-			port, err := getFreePort()
+			ln, err := listenLoopback()
 			if err != nil {
-				return fmt.Errorf("failed to get free port: %w", err)
+				return err
 			}
+			port := ln.Addr().(*net.TCPAddr).Port
 
 			sessions := NewSessionManager(port, logger)
 			messagingHost := NewMessagingHost(logger, sessions)
 
 			handler := NewWebSocketHandler(sessions)
 
-			logger.Info("Listening", "port", port)
+			logger.Info("Listening", "addr", ln.Addr().String())
 
 			server := &http.Server{
-				Addr:    fmt.Sprintf(":%d", port),
 				Handler: handler,
 			}
 
@@ -280,7 +280,7 @@ func NewCmdServe() *cobra.Command {
 			}()
 
 			go func() {
-				if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				if err := server.Serve(ln); err != nil && err != http.ErrServerClosed {
 					logger.Error("HTTP server error", "error", err)
 					done <- err
 				}
@@ -838,19 +838,13 @@ func getConnectionUpgrader(
 	}
 }
 
-// GetFreePort asks the kernel for a free open port that is ready to use.
-func getFreePort() (int, error) {
-	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
+// listenLoopback binds the PTY socket on 127.0.0.1. The side panel is given that address.
+func listenLoopback() (net.Listener, error) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		return 0, err
+		return nil, fmt.Errorf("failed to listen on 127.0.0.1: %w", err)
 	}
-
-	l, err := net.ListenTCP("tcp", addr)
-	if err != nil {
-		return 0, err
-	}
-	defer l.Close()
-	return l.Addr().(*net.TCPAddr).Port, nil
+	return ln, nil
 }
 
 func ExtractMetadata(reader io.Reader) (CommandMetadata, error) {
