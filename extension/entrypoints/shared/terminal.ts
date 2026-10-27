@@ -16,6 +16,7 @@ import {
     mountAgentLauncher,
     optsFromAppId,
 } from "./agentLauncher";
+import { NativeUnavailable } from "./nativeRpc";
 import { type PtyAttachHandle, attachPtySocket } from "./ptyAttach";
 
 const terminalFontFamily = "JetBrainsMono Nerd Font Mono";
@@ -376,10 +377,11 @@ async function main() {
     }
 
     async function switchTo(id: string) {
-        if (!state || id === state.activeId) {
+        if (!state || !state.tabs.includes(id)) {
             return;
         }
-        if (!state.tabs.includes(id)) {
+        if (id === state.activeId && activeTtyId === id && ws?.readyState === WebSocket.OPEN) {
+            terminal.focus();
             return;
         }
         const gen = ++switchGen;
@@ -389,10 +391,14 @@ async function main() {
         try {
             await attachActive(gen);
         } catch (err) {
-            if (gen === switchGen) {
-                console.error("switch failed:", err);
-                showSetup((err as Error).message);
+            if (gen !== switchGen) {
+                return;
             }
+            if (err instanceof NativeUnavailable) {
+                return;
+            }
+            console.error("switch failed:", err);
+            showSetup((err as Error).message);
         }
     }
 
@@ -406,7 +412,9 @@ async function main() {
             created = await createWithFallback(appId);
             await ensureWindowAlive(windowId, created.id);
         } catch (err) {
-            showSetup((err as Error).message);
+            if (!(err instanceof NativeUnavailable)) {
+                showSetup((err as Error).message);
+            }
             return;
         }
         if (gen !== switchGen) {
@@ -422,7 +430,7 @@ async function main() {
         try {
             await attachActive(gen);
         } catch (err) {
-            if (gen === switchGen) {
+            if (gen === switchGen && !(err instanceof NativeUnavailable)) {
                 showSetup((err as Error).message);
             }
         }
@@ -490,7 +498,7 @@ async function main() {
                 titles.delete(id);
             }
         } catch (err) {
-            if (gen === switchGen) {
+            if (gen === switchGen && !(err instanceof NativeUnavailable)) {
                 showSetup((err as Error).message);
             }
         }

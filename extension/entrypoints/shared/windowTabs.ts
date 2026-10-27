@@ -1,3 +1,4 @@
+import { errorFromResponse, NativeUnavailable } from "./nativeRpc";
 import type {
     RequestAttachTTY,
     RequestCreateTTY,
@@ -75,7 +76,7 @@ export async function createTTY(opts: CreateTTYOpts = { mode: "shell" }): Promis
         params,
     });
     if ("error" in resp) {
-        throw new Error(resp.error.message);
+        throw errorFromResponse(resp);
     }
     return resp.result;
 }
@@ -88,6 +89,10 @@ export async function attachTTY(id: string): Promise<{ id: string; url: string }
         params: { id },
     });
     if ("error" in resp) {
+        const failure = errorFromResponse(resp);
+        if (failure instanceof NativeUnavailable) {
+            throw failure;
+        }
         return null;
     }
     return resp.result;
