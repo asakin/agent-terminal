@@ -35,10 +35,6 @@ var legacyConfigDir = filepath.Join(os.Getenv("HOME"), ".config", "tweety")
 var legacyCacheDir = filepath.Join(os.Getenv("HOME"), ".cache", "tweety")
 var legacyDataDir = filepath.Join(os.Getenv("HOME"), ".local", "share", "tweety")
 
-const nativeHostID = "com.agentterminal.native"
-const nativeHostManifest = "com.agentterminal.native.json"
-const legacyNativeHostManifest = "com.github.pomdtr.tweety.json"
-
 func NewCmdRoot(version string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "agent-terminal",
@@ -55,7 +51,6 @@ func NewCmdRoot(version string) *cobra.Command {
 
 	cmd.AddCommand(
 		NewCmdServe(),
-		NewCmdInstall(),
 		NewCmdRun(),
 	)
 

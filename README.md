@@ -23,32 +23,38 @@ Each terminal is a local shell. An agent in that shell uses whatever browser too
 
 The side panel is a terminal next to the browser, in the same window.
 
-
 |                             | Agent Terminal                                   | IDE / Terminal.app alone                   |
 | --------------------------- | ------------------------------------------------ | ------------------------------------------ |
 | Where the terminal sits     | Chrome side panel, beside the page               | A separate app                             |
 | You stay in the loop        | Same window                                      | You switch away to watch a terminal        |
 | One-click agents            | Scripts in ~/.config/agent-terminal/apps         | Manual shells and PATH |
 
+## Install
 
-## Quick start
-
-**Prerequisites:** [Go](https://go.dev/) 1.24+, [Node.js](https://nodejs.org/en) 20+, Chrome.
+Chrome, then:
 
 ```sh
-git clone https://github.com/rishiskhare/agent-terminal.git
-cd agent-terminal
-go build -o agent-terminal .
-./agent-terminal install
-cd extension && npm install && npm run build
+curl -fsSL https://raw.githubusercontent.com/asakin/agent-terminal/main/install.sh | sh
 ```
+
+The script downloads the binary for this machine, puts `~/.local/bin` on `PATH`, and writes the native-messaging manifest Chrome needs. If that manifest is not written, the script exits with an error. Running it again writes the same files again.
 
 Then load the extension in Chrome:
 
 1. Open `chrome://extensions`
 2. Turn on **Developer mode**
-3. Click **Load unpacked** and choose the `extension/dist/chrome-mv3` folder in this repo
+3. Click **Load unpacked** and choose `~/.local/share/agent-terminal/extensions/chrome` (the installer copies it from the release), or `extension/dist/chrome-mv3` from a checkout
 4. Open the side panel from the Agent Terminal extension icon
+
+From a checkout, build the binary and point the same script at it:
+
+```sh
+git clone https://github.com/asakin/agent-terminal.git
+cd agent-terminal
+go build -o agent-terminal .
+AGENT_TERMINAL_BIN="$PWD/agent-terminal" ./install.sh
+cd extension && npm install && npm run build
+```
 
 ## How it works
 
