@@ -157,9 +157,6 @@ func (m *SessionManager) reap(id string) {
 func (s *Session) finalize() {
 	s.teardownOnce.Do(func() {
 		s.close()
-		if err := closeNamedAgentBrowserSession(browserSessionName(s.ID)); err != nil && s.manager != nil {
-			s.manager.logger.Debug("agent-browser session close", "session", browserSessionName(s.ID), "error", err)
-		}
 	})
 }
 
@@ -361,8 +358,8 @@ func NewMessagingHost(logger *slog.Logger, sessions *SessionManager) *jsonrpc.Ho
 			}
 		}
 
-		session, err := sessions.Create(func(tty pty.Pty, id string) (*pty.Cmd, error) {
-			return buildPtyCommand(tty, id, mode, app, params.Args, params.Cwd)
+		session, err := sessions.Create(func(tty pty.Pty, _ string) (*pty.Cmd, error) {
+			return buildPtyCommand(tty, mode, app, params.Args, params.Cwd)
 		})
 		if err != nil {
 			return nil, err
@@ -569,14 +566,6 @@ func NewMessagingHost(logger *slog.Logger, sessions *SessionManager) *jsonrpc.Ho
 		return map[string]any{"config": cfg}, nil
 	})
 
-	messagingHost.HandleRequest("doctor.status", func(input []byte) (any, error) {
-		return runDoctor(false)
-	})
-
-	messagingHost.HandleRequest("doctor.fix", func(input []byte) (any, error) {
-		return runDoctor(true)
-	})
-
 	return messagingHost
 }
 
@@ -645,11 +634,7 @@ func appExists(app string) bool {
 	return false
 }
 
-func browserSessionName(ttyID string) string {
-	return "at-" + ttyID
-}
-
-func buildPtyCommand(tty pty.Pty, id, mode, app string, args []string, cwd string) (*pty.Cmd, error) {
+func buildPtyCommand(tty pty.Pty, mode, app string, args []string, cwd string) (*pty.Cmd, error) {
 	var cmd *pty.Cmd
 	if mode == "app" && app != "" {
 		entrypoint := filepath.Join(appDir, app)
@@ -689,30 +674,15 @@ func buildPtyCommand(tty pty.Pty, id, mode, app string, args []string, cwd strin
 			}
 		}
 
-		if err := ensureAgentAppScript(entrypoint, app); err != nil {
-			return nil, fmt.Errorf("failed to refresh app launcher: %w", err)
-		}
-
 		cmd = tty.Command(entrypoint, args...)
 	} else {
 		cmd = tty.Command(k.String("command"), k.Strings("args")...)
 	}
 
-	ptyEnv := k.StringMap("env")
-	// Always keep the agent-browser shim first. Interactive shells often rewrite
-	// PATH from rc files and would otherwise hit a non-gated agent-browser
-	// (Auto-launch / Chrome-for-Testing) instead of browser-gate.
-	pathForPty := prependPath(firstNonEmpty(ptyEnv["PATH"], os.Getenv("PATH")), shimDir)
-	ptyEnv = copyStringMap(ptyEnv)
-	ptyEnv["PATH"] = pathForPty
-	// AGENT_BROWSER_SESSION is forced last so config env cannot override isolation.
 	cmd.Env = mergePtyEnv(os.Environ(), map[string]string{
-		"TERM":                   "xterm-256color",
-		"TERM_PROGRAM":           "agent-terminal",
-		"AGENT_TERMINAL_BROWSER": filepath.Join(shimDir, "agent-browser"),
-	}, ptyEnv, map[string]string{
-		"AGENT_BROWSER_SESSION": browserSessionName(id),
-	})
+		"TERM":         "xterm-256color",
+		"TERM_PROGRAM": "agent-terminal",
+	}, k.StringMap("env"))
 
 	if cwd != "" {
 		cmd.Dir = cwd
@@ -720,32 +690,11 @@ func buildPtyCommand(tty pty.Pty, id, mode, app string, args []string, cwd strin
 		cmd.Dir = os.Getenv("HOME")
 	}
 
-	// Do not heal/close --all here: that nukes sibling PTY browser sessions.
-	// Gate heals on the first browser command when the CDP fingerprint changes.
-
 	return cmd, nil
 }
 
-func firstNonEmpty(vals ...string) string {
-	for _, v := range vals {
-		if v != "" {
-			return v
-		}
-	}
-	return ""
-}
-
-func copyStringMap(in map[string]string) map[string]string {
-	out := make(map[string]string, len(in))
-	for k, v := range in {
-		out[k] = v
-	}
-	return out
-}
-
-// mergePtyEnv builds the PTY environment. Later maps win; keys replace any
-// prior entry so config PATH (with the agent-browser shim) is not ignored
-// behind a duplicate inherited PATH= (getenv uses the first occurrence).
+// mergePtyEnv builds the PTY environment. Later maps win, and a key replaces
+// any earlier entry so the first duplicate is not the one getenv returns.
 func mergePtyEnv(base []string, overlays ...map[string]string) []string {
 	envMap := map[string]string{}
 	order := make([]string, 0, len(base)+8)

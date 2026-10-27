@@ -58,7 +58,7 @@ export async function fetchAppNames(): Promise<string[]> {
     if ("error" in resp || !Array.isArray(resp.result.apps)) {
         return [];
     }
-    return resp.result.apps.filter((a) => typeof a === "string" && a && a !== "agent-browser");
+    return resp.result.apps.filter((a) => typeof a === "string" && a);
 }
 
 /** Drop stale lastApp; shell is always valid. */

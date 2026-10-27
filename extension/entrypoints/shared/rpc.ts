@@ -45,28 +45,6 @@ export type RequestConfigSet = JSONRPCRequestBase<"config.set", {
     config: Record<string, unknown>;
 }>;
 
-export type RequestDoctorStatus = JSONRPCRequestBase<"doctor.status", undefined>;
-
-export type RequestDoctorFix = JSONRPCRequestBase<"doctor.fix", undefined>;
-
-export type DoctorCheck = {
-    id: string;
-    label: string;
-    status: "ok" | "warn" | "error" | "info";
-    detail: string;
-    fixHint?: string;
-};
-
-export type DoctorStatusResult = {
-    ok: boolean;
-    level: "ok" | "warn" | "error";
-    checks: DoctorCheck[];
-    agents?: string[];
-    message: string;
-    config?: Record<string, unknown>;
-};
-
-
 type JSONRPCResponseBase<T extends Record<string, any> = Record<string, any>> = {
     jsonrpc: "2.0";
     id: string;
@@ -114,7 +92,4 @@ export type ResponseConfigGet = JSONRPCResponseBase<{
 
 export type ResponseConfigSet = JSONRPCResponseBase<{
     config: Record<string, unknown>;
-}>
-
-export type ResponseDoctorStatus = JSONRPCResponseBase<DoctorStatusResult>
-export type ResponseDoctorFix = ResponseDoctorStatus
+}>;
