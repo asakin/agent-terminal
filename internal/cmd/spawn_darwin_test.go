@@ -47,7 +47,13 @@ func TestSpawnChildParentIsHelper(t *testing.T) {
 	defer tty.Close()
 
 	marker := filepath.Join(t.TempDir(), "ran")
-	cmd := tty.Command("/bin/sh", "-c", "ps -o ppid= -p $$ > "+marker)
+	out := make(chan []byte, 1)
+	go func() {
+		buf := make([]byte, 128)
+		n, _ := tty.Read(buf)
+		out <- buf[:n]
+	}()
+	cmd := tty.Command("/bin/sh", "-c", "echo hello-from-child; ps -o ppid= -p $$ > "+marker)
 	wait, err := dialSpawn(sock, tty, cmd)
 	if err != nil {
 		t.Fatal(err)
@@ -65,6 +71,14 @@ func TestSpawnChildParentIsHelper(t *testing.T) {
 	}
 	if ppid != helper.Process.Pid {
 		t.Fatalf("parent %d, helper %d", ppid, helper.Process.Pid)
+	}
+	select {
+	case b := <-out:
+		if !strings.Contains(string(b), "hello-from-child") {
+			t.Fatalf("tty output %q", b)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("child wrote nothing to the terminal")
 	}
 }
 

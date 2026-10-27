@@ -24,12 +24,21 @@ json_escape() {
 	printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
 }
 
+# Replace dest by a new inode. Copying onto a running Mach-O makes macOS
+# kill the next exec with a codesign failure.
+place_binary() {
+	src=$1
+	staged=$(mktemp "$bin_dir/.agent-terminal.XXXXXX") || fail "could not create a temporary binary"
+	cp "$src" "$staged" || fail "could not copy the binary"
+	chmod 755 "$staged" || fail "could not make the binary executable"
+	mv -f "$staged" "$dest" || fail "could not install the binary"
+}
+
 install_binary() {
 	mkdir -p "$bin_dir"
 	if [ -n "${AGENT_TERMINAL_BIN:-}" ]; then
 		[ -f "$AGENT_TERMINAL_BIN" ] || fail "AGENT_TERMINAL_BIN is not a file: $AGENT_TERMINAL_BIN"
-		cp "$AGENT_TERMINAL_BIN" "$dest"
-		chmod 755 "$dest"
+		place_binary "$AGENT_TERMINAL_BIN"
 	else
 		os=$(uname -s | tr '[:upper:]' '[:lower:]')
 		arch=$(uname -m)
@@ -50,8 +59,7 @@ install_binary() {
 		curl -fsSL -o "$tmp/archive.tar.gz" "$url" || fail "download failed: $url"
 		tar -xzf "$tmp/archive.tar.gz" -C "$tmp" || fail "could not unpack $url"
 		[ -f "$tmp/agent-terminal" ] || fail "archive has no agent-terminal binary"
-		cp "$tmp/agent-terminal" "$dest"
-		chmod 755 "$dest"
+		place_binary "$tmp/agent-terminal"
 		if [ -d "$tmp/extensions/chrome" ]; then
 			rm -rf "$data_dir/extensions/chrome"
 			mkdir -p "$data_dir/extensions"
@@ -254,8 +262,27 @@ EOF
 		return 0
 	fi
 	domain="gui/$(id -u)"
-	launchctl bootout "$domain/com.agentterminal.spawn" 2>/dev/null || true
-	launchctl bootstrap "$domain" "$plist" || fail "could not start the spawn agent"
+	target="$domain/com.agentterminal.spawn"
+	launchctl bootout "$target" 2>/dev/null || true
+	# bootout returns before the job is gone. bootstrap during that window
+	# fails with "Bootstrap failed: 5: Input/output error".
+	n=0
+	while launchctl print "$target" >/dev/null 2>&1; do
+		n=$((n + 1))
+		if [ "$n" -ge 20 ]; then
+			launchctl kickstart -k "$target" || fail "could not start the spawn agent"
+			return 0
+		fi
+		sleep 0.1
+	done
+	n=0
+	while ! launchctl bootstrap "$domain" "$plist"; do
+		n=$((n + 1))
+		if [ "$n" -ge 8 ]; then
+			fail "could not start the spawn agent"
+		fi
+		sleep 0.25
+	done
 }
 
 install_binary
