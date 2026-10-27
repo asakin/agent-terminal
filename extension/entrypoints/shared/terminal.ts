@@ -17,6 +17,23 @@ import {
     optsFromAppId,
 } from "./agentLauncher";
 import { type PtyAttachHandle, attachPtySocket } from "./ptyAttach";
+
+const terminalFontFamily = "JetBrainsMono Nerd Font Mono";
+
+async function loadTerminalFont(config: Record<string, unknown>) {
+    const family = typeof config.fontFamily === "string" ? config.fontFamily : "";
+    if (!family.includes(terminalFontFamily)) {
+        return;
+    }
+    const size = typeof config.fontSize === "number" ? config.fontSize : 13;
+    const face = `${size}px "${terminalFontFamily}"`;
+    await Promise.all([
+        document.fonts.load(face),
+        document.fonts.load(`bold ${face}`),
+        document.fonts.load(`italic ${face}`),
+        document.fonts.load(`bold italic ${face}`),
+    ]);
+}
 import {
     MAX_TABS,
     type WindowTabState,
@@ -138,6 +155,7 @@ async function main() {
             showSetup((err as Error).message);
             return;
         }
+        await loadTerminalFont(xtermResp.result);
         await runSingleTerminal(anchor, xtermResp.result, tty);
         return;
     }
@@ -189,6 +207,7 @@ async function main() {
     let ws: WebSocket | null = null;
     let ptyAttach: PtyAttachHandle | null = null;
 
+    await loadTerminalFont(xtermResp.result);
     const terminal = new Terminal(xtermResp.result);
     bindKeySequences(terminal);
     const fitAddon = new FitAddon();

@@ -30,6 +30,8 @@ import (
 //go:embed all:themes
 var themeFs embed.FS
 
+const terminalFontFamily = `"JetBrainsMono Nerd Font Mono", monospace`
+
 const scrollbackBytes = 2 << 20 // 2 MiB
 
 type Session struct {
@@ -474,12 +476,15 @@ func NewMessagingHost(logger *slog.Logger, sessions *SessionManager) *jsonrpc.Ho
 			"macOptionIsMeta":               true,
 			"macOptionClickForcesSelection": true,
 			"fontSize":                      13,
-			"fontFamily":                    "Consolas,Liberation Mono,Menlo,Courier,monospace",
+			"fontFamily":                    terminalFontFamily,
 			"theme":                         json.RawMessage(themeBytes),
 		}
 
 		if err := k.Unmarshal("xterm", &xtermConfig); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal xterm config: %w", err)
+		}
+		if family, _ := xtermConfig["fontFamily"].(string); family == "" {
+			xtermConfig["fontFamily"] = terminalFontFamily
 		}
 
 		return xtermConfig, nil
