@@ -6,7 +6,7 @@ const LAST_APP_KEY = "agent-terminal.lastApp";
 const SHELL_ID = "";
 
 /** Product agents in display order (only shown when present in apps/). */
-const PRODUCT_ORDER = ["claude", "codex", "cursor-agent", "goose", "pi", "opencode", "hermes", "openclaw"] as const;
+const PRODUCT_ORDER = ["pi", "opencode", "goose", "claude", "codex", "cursor-agent"] as const;
 
 const LABELS: Record<string, string> = {
     claude: "Claude",
@@ -15,8 +15,6 @@ const LABELS: Record<string, string> = {
     goose: "Goose",
     pi: "Pi",
     opencode: "OpenCode",
-    hermes: "Hermes",
-    openclaw: "OpenClaw",
 };
 
 export type LauncherController = {
@@ -60,7 +58,7 @@ export async function fetchAppNames(): Promise<string[]> {
     if ("error" in resp || !Array.isArray(resp.result.apps)) {
         return [];
     }
-    return resp.result.apps.filter((a) => typeof a === "string" && a && a !== "agent-browser");
+    return resp.result.apps.filter((a) => typeof a === "string" && a);
 }
 
 /** Drop stale lastApp; shell is always valid. */

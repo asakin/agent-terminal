@@ -16,7 +16,25 @@ import {
     mountAgentLauncher,
     optsFromAppId,
 } from "./agentLauncher";
+import { NativeUnavailable } from "./nativeRpc";
 import { type PtyAttachHandle, attachPtySocket } from "./ptyAttach";
+
+const terminalFontFamily = "JetBrainsMono Nerd Font Mono";
+
+async function loadTerminalFont(config: Record<string, unknown>) {
+    const family = typeof config.fontFamily === "string" ? config.fontFamily : "";
+    if (!family.includes(terminalFontFamily)) {
+        return;
+    }
+    const size = typeof config.fontSize === "number" ? config.fontSize : 13;
+    const face = `${size}px "${terminalFontFamily}"`;
+    await Promise.all([
+        document.fonts.load(face),
+        document.fonts.load(`bold ${face}`),
+        document.fonts.load(`italic ${face}`),
+        document.fonts.load(`bold italic ${face}`),
+    ]);
+}
 import {
     MAX_TABS,
     type WindowTabState,
@@ -138,6 +156,7 @@ async function main() {
             showSetup((err as Error).message);
             return;
         }
+        await loadTerminalFont(xtermResp.result);
         await runSingleTerminal(anchor, xtermResp.result, tty);
         return;
     }
@@ -189,6 +208,7 @@ async function main() {
     let ws: WebSocket | null = null;
     let ptyAttach: PtyAttachHandle | null = null;
 
+    await loadTerminalFont(xtermResp.result);
     const terminal = new Terminal(xtermResp.result);
     bindKeySequences(terminal);
     const fitAddon = new FitAddon();
@@ -357,10 +377,11 @@ async function main() {
     }
 
     async function switchTo(id: string) {
-        if (!state || id === state.activeId) {
+        if (!state || !state.tabs.includes(id)) {
             return;
         }
-        if (!state.tabs.includes(id)) {
+        if (id === state.activeId && activeTtyId === id && ws?.readyState === WebSocket.OPEN) {
+            terminal.focus();
             return;
         }
         const gen = ++switchGen;
@@ -370,10 +391,14 @@ async function main() {
         try {
             await attachActive(gen);
         } catch (err) {
-            if (gen === switchGen) {
-                console.error("switch failed:", err);
-                showSetup((err as Error).message);
+            if (gen !== switchGen) {
+                return;
             }
+            if (err instanceof NativeUnavailable) {
+                return;
+            }
+            console.error("switch failed:", err);
+            showSetup((err as Error).message);
         }
     }
 
@@ -387,7 +412,9 @@ async function main() {
             created = await createWithFallback(appId);
             await ensureWindowAlive(windowId, created.id);
         } catch (err) {
-            showSetup((err as Error).message);
+            if (!(err instanceof NativeUnavailable)) {
+                showSetup((err as Error).message);
+            }
             return;
         }
         if (gen !== switchGen) {
@@ -403,7 +430,7 @@ async function main() {
         try {
             await attachActive(gen);
         } catch (err) {
-            if (gen === switchGen) {
+            if (gen === switchGen && !(err instanceof NativeUnavailable)) {
                 showSetup((err as Error).message);
             }
         }
@@ -471,7 +498,7 @@ async function main() {
                 titles.delete(id);
             }
         } catch (err) {
-            if (gen === switchGen) {
+            if (gen === switchGen && !(err instanceof NativeUnavailable)) {
                 showSetup((err as Error).message);
             }
         }
