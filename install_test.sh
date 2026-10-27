@@ -4,6 +4,7 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
+export AGENT_TERMINAL_SKIP_LAUNCHD=1
 
 bin="$tmp/fake-agent-terminal"
 printf '#!/bin/sh\necho agent-terminal\n' >"$bin"
@@ -35,6 +36,13 @@ grep -qx 'hello' "$home/AGENTS.md"
 grep -qx 'bye' "$home/AGENTS.md"
 grep -c 'agent-terminal:start' "$home/AGENTS.md" | grep -qx 1
 grep -q 'Playwright' "$home/AGENTS.md"
+
+if [ "$(uname -s)" = Darwin ]; then
+	plist="$home/Library/LaunchAgents/com.agentterminal.spawn.plist"
+	[ -s "$plist" ]
+	grep -F "$home/.local/bin/agent-terminal" "$plist" >/dev/null
+	grep -F '<string>spawn</string>' "$plist" >/dev/null
+fi
 
 empty="$tmp/empty"
 mkdir -p "$empty"

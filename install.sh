@@ -222,9 +222,46 @@ write_instructions() {
 	upsert_managed "$home/CLAUDE.md" "$(claude_body)"
 }
 
+xml_escape() {
+	printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'
+}
+
+write_launchd() {
+	[ "$(uname -s)" = Darwin ] || return 0
+	plist="$home/Library/LaunchAgents/com.agentterminal.spawn.plist"
+	mkdir -p "$(dirname "$plist")"
+	cat >"$plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.agentterminal.spawn</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>$(xml_escape "$dest")</string>
+		<string>spawn</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<true/>
+</dict>
+</plist>
+EOF
+	[ -s "$plist" ] || fail "could not write $plist"
+	if [ -n "${AGENT_TERMINAL_SKIP_LAUNCHD:-}" ]; then
+		return 0
+	fi
+	domain="gui/$(id -u)"
+	launchctl bootout "$domain/com.agentterminal.spawn" 2>/dev/null || true
+	launchctl bootstrap "$domain" "$plist" || fail "could not start the spawn agent"
+}
+
 install_binary
 write_host
 write_manifests
+write_launchd
 ensure_path
 write_instructions
 echo "agent-terminal: installed $dest"

@@ -103,7 +103,8 @@ func (m *SessionManager) Create(cmdFactory func(tty pty.Pty, id string) (*pty.Cm
 		return nil, err
 	}
 
-	if err := cmd.Start(); err != nil {
+	wait, err := startPty(tty, cmd)
+	if err != nil {
 		tty.Close()
 		return nil, fmt.Errorf("failed to start pty: %w", err)
 	}
@@ -121,7 +122,7 @@ func (m *SessionManager) Create(cmdFactory func(tty pty.Pty, id string) (*pty.Cm
 
 	go session.readLoop(m.logger)
 	go func() {
-		_ = cmd.Wait()
+		_ = wait()
 		m.reap(id)
 	}()
 

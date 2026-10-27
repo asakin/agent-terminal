@@ -37,7 +37,7 @@ Chrome, then:
 curl -fsSL https://raw.githubusercontent.com/asakin/agent-terminal/main/install.sh | sh
 ```
 
-The script downloads the binary for this machine, puts `~/.local/bin` on `PATH`, and writes the native-messaging manifest Chrome needs. If that manifest is not written, the script exits with an error. Running it again writes the same files again.
+The script downloads the binary for this machine, puts `~/.local/bin` on `PATH`, and writes the native-messaging manifest Chrome needs. On macOS it also starts a LaunchAgent that launches the shell, so programs the agent runs are not children of Chrome. If that manifest is not written, the script exits with an error. Running it again writes the same files again.
 
 Then load the extension in Chrome:
 

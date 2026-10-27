@@ -88,6 +88,17 @@ function showSetup(message: string) {
     document.body.appendChild(renderSetupScreen(message));
 }
 
+function refitWhenResized(anchor: HTMLElement, terminal: Terminal, fit: { fit: () => void }) {
+    const apply = () => {
+        fit.fit();
+        if (terminal.rows > 0) {
+            terminal.refresh(0, terminal.rows - 1);
+        }
+    };
+    apply();
+    new ResizeObserver(apply).observe(anchor);
+}
+
 /** Rebuild tab list only — launcher host is a stable sibling. */
 function renderTabList(
     list: HTMLElement,
@@ -237,6 +248,7 @@ async function main() {
     } catch {
         // Canvas renderer remains the default.
     }
+    refitWhenResized(anchor, terminal, fitAddon);
 
     const refreshStrip = () => {
         renderTabList(list, state!, titles, {
@@ -516,10 +528,6 @@ async function main() {
         detachSocket();
     };
 
-    globalThis.onresize = () => {
-        fitAddon.fit();
-    };
-
     globalThis.onfocus = () => {
         // Don't steal focus from the agent menu.
         if (document.querySelector(".at-launcher__menu")) {
@@ -572,7 +580,6 @@ async function runSingleTerminal(
             params: { tty: activeTtyId, cols, rows },
         });
     });
-    fitAddon.fit();
 
     try {
         const webglAddon = new WebglAddon();
@@ -583,6 +590,7 @@ async function runSingleTerminal(
     } catch {
         // Canvas fallback.
     }
+    refitWhenResized(anchor, terminal, fitAddon);
 
     let ws: WebSocket | null = new WebSocket(tty.url);
     let ptyAttach: PtyAttachHandle | null = null;
@@ -644,9 +652,6 @@ async function runSingleTerminal(
                 // ignore
             }
         }
-    };
-    globalThis.onresize = () => {
-        fitAddon.fit();
     };
     terminal.onTitleChange((title) => {
         document.title = `${title}  |  Agent Terminal`;
