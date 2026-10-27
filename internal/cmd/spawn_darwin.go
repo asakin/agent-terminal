@@ -50,7 +50,9 @@ func startPty(tty pty.Pty, cmd *pty.Cmd) (func() error, error) {
 }
 
 func dialSpawn(path string, tty pty.Pty, cmd *pty.Cmd) (func() error, error) {
-	slave, err := os.Open(tty.Name())
+	// The helper writes the child's stdout through this fd, so it has to be
+	// writable. O_NOCTTY keeps the host from adopting the slave.
+	slave, err := os.OpenFile(tty.Name(), os.O_RDWR|syscall.O_NOCTTY, 0)
 	if err != nil {
 		return nil, err
 	}
