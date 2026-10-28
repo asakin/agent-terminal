@@ -143,8 +143,19 @@ export default defineBackground(() => {
       return false; // Ignore messages from unknown senders
     }
 
+    const id = msg && typeof msg.id === "string" ? msg.id : "";
+    if (!id) {
+      sendResponse({
+        jsonrpc: "2.0",
+        error: {
+          code: -32600,
+          message: "id is required",
+        },
+      });
+      return true;
+    }
+
     getNativePort().then(async (nativePort) => {
-      const id = msg.id || generateSecureId(12);
       if (!nativePort) {
         sendResponse({
           jsonrpc: "2.0",
@@ -157,12 +168,12 @@ export default defineBackground(() => {
         return;
       }
 
-      const res = await requestNative(nativePort, { ...msg, id });
+      const res = await requestNative(nativePort, msg);
       sendResponse(res);
     }).catch((err: unknown) => {
       sendResponse({
         jsonrpc: "2.0",
-        id: msg.id || generateSecureId(12),
+        id,
         error: {
           code: -32001,
           message: err instanceof Error ? err.message : "Native host is not connected",

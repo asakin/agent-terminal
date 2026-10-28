@@ -49,6 +49,7 @@ import {
     resolveWindowId,
     saveWindowState,
     shortTabLabel,
+    type TtyDimensions,
 } from "./windowTabs";
 
 function isSidePanelPage(): boolean {
@@ -60,7 +61,7 @@ function isEphemeralLaunch(): boolean {
     return new URLSearchParams(location.search).has("app") || !isSidePanelPage();
 }
 
-async function createEphemeralTTY(): Promise<{ id: string; url: string }> {
+async function createEphemeralTTY(size: TtyDimensions): Promise<{ id: string; url: string }> {
     const searchParams = new URLSearchParams(window.location.search);
     if (searchParams.has("app")) {
         const resp = await browser.runtime.sendMessage<RequestCreateTTY, ResponseCreateTTY>({
@@ -72,6 +73,8 @@ async function createEphemeralTTY(): Promise<{ id: string; url: string }> {
                 app: searchParams.get("app")!,
                 args: searchParams.getAll("arg"),
                 cwd: searchParams.get("cwd") || undefined,
+                cols: size.cols,
+                rows: size.rows,
             },
         });
         if ("error" in resp) {
@@ -79,24 +82,65 @@ async function createEphemeralTTY(): Promise<{ id: string; url: string }> {
         }
         return resp.result;
     }
-    return createTTY({ mode: "shell" });
+    return createTTY({ mode: "shell", cols: size.cols, rows: size.rows });
+}
+
+type TtySize = TtyDimensions & { tty: string };
+
+function sameTtySize(a: TtySize, b: TtySize): boolean {
+    return a.tty === b.tty && a.cols === b.cols && a.rows === b.rows;
+}
+
+function createResizeSender() {
+    let latest: TtySize | null = null;
+    let inflight = false;
+
+    const kick = () => {
+        if (inflight || !latest) {
+            return;
+        }
+        inflight = true;
+        const target = latest;
+        void browser.runtime.sendMessage<RequestResizeTTY>({
+            jsonrpc: "2.0",
+            id: crypto.randomUUID(),
+            method: "tty.resize",
+            params: { tty: target.tty, cols: target.cols, rows: target.rows },
+        }).finally(() => {
+            inflight = false;
+            if (latest && !sameTtySize(latest, target)) {
+                kick();
+            }
+        });
+    };
+
+    return (target: TtySize) => {
+        latest = target;
+        kick();
+    };
+}
+
+function watchTerminalBox(
+    anchor: HTMLElement,
+    terminal: Terminal,
+    fit: FitAddon,
+    onBox: () => void,
+) {
+    const apply = () => {
+        fit.fit();
+        if (terminal.rows > 0) {
+            terminal.refresh(0, terminal.rows - 1);
+        }
+        onBox();
+    };
+    apply();
+    new ResizeObserver(apply).observe(anchor);
 }
 
 function showSetup(message: string) {
     document.body.className = "at-setup-host";
     document.body.innerHTML = "";
     document.body.appendChild(renderSetupScreen(message));
-}
-
-function refitWhenResized(anchor: HTMLElement, terminal: Terminal, fit: { fit: () => void }) {
-    const apply = () => {
-        fit.fit();
-        if (terminal.rows > 0) {
-            terminal.refresh(0, terminal.rows - 1);
-        }
-    };
-    apply();
-    new ResizeObserver(apply).observe(anchor);
 }
 
 /** Rebuild tab list only — launcher host is a stable sibling. */
@@ -160,15 +204,8 @@ async function main() {
 
     // Ephemeral: terminal.html / popup / ?app= — no strip, no window state.
     if (isEphemeralLaunch()) {
-        let tty: { id: string; url: string };
-        try {
-            tty = await createEphemeralTTY();
-        } catch (err) {
-            showSetup((err as Error).message);
-            return;
-        }
         await loadTerminalFont(xtermResp.result);
-        await runSingleTerminal(anchor, xtermResp.result, tty);
+        await runSingleTerminal(anchor, xtermResp.result);
         return;
     }
 
@@ -206,16 +243,14 @@ async function main() {
     });
 
     let state = await loadWindowState(windowId);
-    if (!state || state.tabs.length === 0) {
-        const created = await createWithFallback();
-        await ensureWindowAlive(windowId, created.id);
-        state = { tabs: [created.id], activeId: created.id };
-        await saveWindowState(windowId, state);
+    if (state && state.tabs.length === 0) {
+        state = null;
     }
 
     const titles = new Map<string, string>();
     let switchGen = 0;
-    let activeTtyId = state.activeId;
+    let activeTtyId = "";
+    const scheduleResize = createResizeSender();
     let ws: WebSocket | null = null;
     let ptyAttach: PtyAttachHandle | null = null;
 
@@ -227,16 +262,11 @@ async function main() {
     terminal.loadAddon(new WebLinksAddon());
     terminal.open(anchor);
 
-    terminal.onResize(async (size) => {
+    terminal.onResize((size) => {
         if (!activeTtyId) {
             return;
         }
-        const { cols, rows } = size;
-        await browser.runtime.sendMessage<RequestResizeTTY>({
-            jsonrpc: "2.0",
-            method: "tty.resize",
-            params: { tty: activeTtyId, cols, rows },
-        });
+        scheduleResize({ tty: activeTtyId, cols: size.cols, rows: size.rows });
     });
 
     try {
@@ -248,7 +278,6 @@ async function main() {
     } catch {
         // Canvas renderer remains the default.
     }
-    refitWhenResized(anchor, terminal, fitAddon);
 
     const refreshStrip = () => {
         renderTabList(list, state!, titles, {
@@ -258,17 +287,17 @@ async function main() {
         launcher.setLaunchEnabled(state!.tabs.length < MAX_TABS);
     };
 
-    async function createWithFallback(preferred?: string) {
+    async function createWithFallback(preferred: string | undefined, size: TtyDimensions) {
         try {
             if (preferred !== undefined) {
                 await launcher.rememberApp(preferred);
-                return await createTTY(optsFromAppId(preferred));
+                return await createTTY(optsFromAppId(preferred, size));
             }
-            const opts = await launcher.getCreateOpts();
+            const opts = await launcher.getCreateOpts(size);
             return await createTTY(opts);
         } catch {
             await launcher.rememberApp("");
-            return await createTTY({ mode: "shell" });
+            return await createTTY({ mode: "shell", cols: size.cols, rows: size.rows });
         }
     }
 
@@ -306,7 +335,11 @@ async function main() {
             const pruned = pruneTab(state, state.activeId);
             if (!pruned) {
                 // Recreate with shell — no per-tab app metadata.
-                const created = await createTTY({ mode: "shell" });
+                const size = fitAddon.proposeDimensions();
+                if (!size) {
+                    throw new Error("Terminal has no size yet");
+                }
+                const created = await createTTY({ mode: "shell", cols: size.cols, rows: size.rows });
                 if (gen !== switchGen) {
                     await destroyTTY(created.id);
                     return false;
@@ -320,7 +353,11 @@ async function main() {
             refreshStrip();
             endpoint = await attachTTY(state.activeId);
             if (!endpoint) {
-                const created = await createTTY({ mode: "shell" });
+                const size = fitAddon.proposeDimensions();
+                if (!size) {
+                    throw new Error("Terminal has no size yet");
+                }
+                const created = await createTTY({ mode: "shell", cols: size.cols, rows: size.rows });
                 if (gen !== switchGen) {
                     await destroyTTY(created.id);
                     return false;
@@ -373,13 +410,10 @@ async function main() {
             },
         });
 
-        fitAddon.fit();
-        const dims = { cols: terminal.cols, rows: terminal.rows };
-        await browser.runtime.sendMessage<RequestResizeTTY>({
-            jsonrpc: "2.0",
-            method: "tty.resize",
-            params: { tty: activeTtyId, cols: dims.cols, rows: dims.rows },
-        });
+        const size = fitAddon.proposeDimensions();
+        if (size) {
+            scheduleResize({ tty: activeTtyId, cols: size.cols, rows: size.rows });
+        }
 
         if (gen !== switchGen) {
             return false;
@@ -418,10 +452,14 @@ async function main() {
         if (!state || state.tabs.length >= MAX_TABS) {
             return;
         }
+        const size = fitAddon.proposeDimensions();
+        if (!size) {
+            return;
+        }
         const gen = ++switchGen;
         let created: { id: string; url: string };
         try {
-            created = await createWithFallback(appId);
+            created = await createWithFallback(appId, size);
             await ensureWindowAlive(windowId, created.id);
         } catch (err) {
             if (!(err instanceof NativeUnavailable)) {
@@ -470,12 +508,18 @@ async function main() {
         const neighbor = state.tabs[idx + 1] ?? state.tabs[idx - 1];
 
         if (!neighbor) {
+            const size = fitAddon.proposeDimensions();
+            if (!size) {
+                await clearWindowState(windowId);
+                showSetup("Terminal has no size yet");
+                return;
+            }
             const gen = ++switchGen;
             await destroyTTY(id);
             titles.delete(id);
             let created: { id: string; url: string };
             try {
-                created = await createWithFallback();
+                created = await createWithFallback(undefined, size);
                 await ensureWindowAlive(windowId, created.id);
             } catch (err) {
                 await clearWindowState(windowId);
@@ -550,21 +594,59 @@ async function main() {
         terminal.options.theme = resp.result.theme;
     });
 
-    refreshStrip();
-    const gen = ++switchGen;
-    try {
-        await attachActive(gen);
-    } catch (err) {
-        showSetup((err as Error).message);
+    let createStarted = false;
+    async function createInitial(size: TtyDimensions) {
+        if (createStarted || state) {
+            return;
+        }
+        createStarted = true;
+        const gen = ++switchGen;
+        try {
+            const created = await createWithFallback(undefined, size);
+            await ensureWindowAlive(windowId, created.id);
+            if (gen !== switchGen) {
+                await destroyTTY(created.id);
+                return;
+            }
+            state = { tabs: [created.id], activeId: created.id };
+            await saveWindowState(windowId, state);
+            refreshStrip();
+            await attachActive(gen);
+        } catch (err) {
+            if (gen === switchGen && !(err instanceof NativeUnavailable)) {
+                showSetup((err as Error).message);
+            }
+        }
+    }
+
+    watchTerminalBox(anchor, terminal, fitAddon, () => {
+        if (state) {
+            return;
+        }
+        const size = fitAddon.proposeDimensions();
+        if (!size) {
+            return;
+        }
+        void createInitial(size);
+    });
+
+    if (state) {
+        refreshStrip();
+        const gen = ++switchGen;
+        try {
+            await attachActive(gen);
+        } catch (err) {
+            showSetup((err as Error).message);
+        }
     }
 }
 
 async function runSingleTerminal(
     anchor: HTMLElement,
     xtermConfig: Record<string, unknown>,
-    tty: { id: string; url: string },
 ) {
-    let activeTtyId = tty.id;
+    let activeTtyId = "";
+    const scheduleResize = createResizeSender();
     const terminal = new Terminal(xtermConfig);
     bindKeySequences(terminal);
     const fitAddon = new FitAddon();
@@ -572,13 +654,11 @@ async function runSingleTerminal(
     terminal.loadAddon(new WebLinksAddon());
     terminal.open(anchor);
 
-    terminal.onResize(async (size) => {
-        const { cols, rows } = size;
-        await browser.runtime.sendMessage<RequestResizeTTY>({
-            jsonrpc: "2.0",
-            method: "tty.resize",
-            params: { tty: activeTtyId, cols, rows },
-        });
+    terminal.onResize((size) => {
+        if (!activeTtyId) {
+            return;
+        }
+        scheduleResize({ tty: activeTtyId, cols: size.cols, rows: size.rows });
     });
 
     try {
@@ -590,11 +670,11 @@ async function runSingleTerminal(
     } catch {
         // Canvas fallback.
     }
-    refitWhenResized(anchor, terminal, fitAddon);
 
-    let ws: WebSocket | null = new WebSocket(tty.url);
+    let ws: WebSocket | null = null;
     let ptyAttach: PtyAttachHandle | null = null;
     let ephemeralUnloading = false;
+    let booting = false;
 
     const bindSocket = (socket: WebSocket, id: string) => {
         ptyAttach?.dispose();
@@ -622,14 +702,13 @@ async function runSingleTerminal(
                         return;
                     }
                     try {
-                        const created = await createTTY({ mode: "shell" });
+                        const size = fitAddon.proposeDimensions();
+                        if (!size) {
+                            return;
+                        }
+                        const created = await createTTY({ mode: "shell", cols: size.cols, rows: size.rows });
                         bindSocket(new WebSocket(created.url), created.id);
-                        fitAddon.fit();
-                        await browser.runtime.sendMessage<RequestResizeTTY>({
-                            jsonrpc: "2.0",
-                            method: "tty.resize",
-                            params: { tty: created.id, cols: terminal.cols, rows: terminal.rows },
-                        });
+                        scheduleResize({ tty: created.id, cols: size.cols, rows: size.rows });
                         terminal.focus();
                     } catch (err) {
                         console.error("shell recover failed:", err);
@@ -639,7 +718,28 @@ async function runSingleTerminal(
         });
     };
 
-    bindSocket(ws, tty.id);
+    watchTerminalBox(anchor, terminal, fitAddon, () => {
+        if (activeTtyId || booting) {
+            return;
+        }
+        const size = fitAddon.proposeDimensions();
+        if (!size) {
+            return;
+        }
+        booting = true;
+        void (async () => {
+            try {
+                const tty = await createEphemeralTTY(size);
+                if (ephemeralUnloading) {
+                    return;
+                }
+                bindSocket(new WebSocket(tty.url), tty.id);
+                terminal.focus();
+            } catch (err) {
+                showSetup((err as Error).message);
+            }
+        })();
+    });
 
     globalThis.onbeforeunload = () => {
         ephemeralUnloading = true;

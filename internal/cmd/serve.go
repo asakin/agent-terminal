@@ -329,6 +329,8 @@ func NewMessagingHost(logger *slog.Logger, sessions *SessionManager) *jsonrpc.Ho
 			Args []string `json:"args"`
 			Cwd  string   `json:"cwd"`
 			File string   `json:"file"`
+			Cols int      `json:"cols"`
+			Rows int      `json:"rows"`
 		}
 
 		if len(input) > 0 {
@@ -362,6 +364,9 @@ func NewMessagingHost(logger *slog.Logger, sessions *SessionManager) *jsonrpc.Ho
 		}
 
 		session, err := sessions.Create(func(tty pty.Pty, _ string) (*pty.Cmd, error) {
+			if err := tty.Resize(params.Cols, params.Rows); err != nil {
+				return nil, fmt.Errorf("failed to set size for tty: %w", err)
+			}
 			return buildPtyCommand(tty, mode, app, params.Args, params.Cwd)
 		})
 		if err != nil {
@@ -424,30 +429,30 @@ func NewMessagingHost(logger *slog.Logger, sessions *SessionManager) *jsonrpc.Ho
 		return map[string]any{}, nil
 	})
 
-	messagingHost.HandleNotification("tty.resize", func(input []byte) error {
+	messagingHost.HandleRequest("tty.resize", func(input []byte) (any, error) {
 		var requestParams struct {
 			TTY  string `json:"tty"`
 			Rows int    `json:"rows"`
 			Cols int    `json:"cols"`
 		}
 		if err := json.Unmarshal(input, &requestParams); err != nil {
-			return fmt.Errorf("failed to unmarshal resize params: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal resize params: %w", err)
 		}
 
 		session, ok := sessions.Get(requestParams.TTY)
 		if !ok {
-			return fmt.Errorf("invalid tty ID: %s", requestParams.TTY)
+			return nil, fmt.Errorf("invalid tty ID: %s", requestParams.TTY)
 		}
 
 		if err := session.Pty.Resize(requestParams.Cols, requestParams.Rows); err != nil {
-			return fmt.Errorf("failed to set size for tty: %w", err)
+			return nil, fmt.Errorf("failed to set size for tty: %w", err)
 		}
 		session.mu.Lock()
 		session.cols = requestParams.Cols
 		session.rows = requestParams.Rows
 		session.mu.Unlock()
 
-		return nil
+		return map[string]any{}, nil
 	})
 
 	messagingHost.HandleRequest("xterm.getConfig", func(input []byte) (any, error) {
