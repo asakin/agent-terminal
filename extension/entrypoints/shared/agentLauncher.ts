@@ -1,6 +1,6 @@
 import { agentIconSVG } from "./agentIcons";
 import type { RequestConfigGet, ResponseConfigGet } from "./rpc";
-import type { CreateTTYOpts } from "./windowTabs";
+import type { CreateTTYOpts, TtyDimensions } from "./windowTabs";
 
 const LAST_APP_KEY = "agent-terminal.lastApp";
 const SHELL_ID = "";
@@ -20,7 +20,7 @@ const LABELS: Record<string, string> = {
 export type LauncherController = {
     setLaunchEnabled: (enabled: boolean) => void;
     refreshCatalog: () => Promise<void>;
-    getCreateOpts: () => Promise<CreateTTYOpts>;
+    getCreateOpts: (size: TtyDimensions) => Promise<CreateTTYOpts>;
     rememberApp: (appId: string) => Promise<void>;
 };
 
@@ -69,11 +69,11 @@ export function resolveLastApp(last: string, apps: string[]): string {
     return apps.includes(last) ? last : SHELL_ID;
 }
 
-export function optsFromAppId(appId: string): CreateTTYOpts {
+export function optsFromAppId(appId: string, size: TtyDimensions): CreateTTYOpts {
     if (!appId) {
-        return { mode: "shell" };
+        return { mode: "shell", cols: size.cols, rows: size.rows };
     }
-    return { mode: "app", app: appId };
+    return { mode: "app", app: appId, cols: size.cols, rows: size.rows };
 }
 
 /** Known product order, then any extra apps/, then Terminal. */
@@ -297,12 +297,12 @@ export function mountAgentLauncher(
             }
             paintPrimary();
         },
-        async getCreateOpts() {
+        async getCreateOpts(size: TtyDimensions) {
             apps = await fetchAppNames();
             lastApp = resolveLastApp(await loadLastApp(), apps);
             await saveLastApp(lastApp);
             paintPrimary();
-            return optsFromAppId(lastApp);
+            return optsFromAppId(lastApp, size);
         },
         async rememberApp(appId: string) {
             lastApp = resolveLastApp(appId, apps.length ? apps : await fetchAppNames());

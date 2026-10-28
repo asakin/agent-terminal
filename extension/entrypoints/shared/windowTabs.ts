@@ -61,14 +61,19 @@ export async function destroyTTY(id: string): Promise<void> {
     }
 }
 
-export type CreateTTYOpts =
-    | { mode: "shell" }
-    | { mode: "app"; app: string };
+export type TtyDimensions = {
+    cols: number;
+    rows: number;
+};
 
-export async function createTTY(opts: CreateTTYOpts = { mode: "shell" }): Promise<{ id: string; url: string }> {
+export type CreateTTYOpts =
+    | ({ mode: "shell" } & TtyDimensions)
+    | ({ mode: "app"; app: string } & TtyDimensions);
+
+export async function createTTY(opts: CreateTTYOpts): Promise<{ id: string; url: string }> {
     const params = opts.mode === "app"
-        ? { mode: "app" as const, app: opts.app }
-        : { mode: "shell" as const };
+        ? { mode: "app" as const, app: opts.app, cols: opts.cols, rows: opts.rows }
+        : { mode: "shell" as const, cols: opts.cols, rows: opts.rows };
     const resp = await browser.runtime.sendMessage<RequestCreateTTY, ResponseCreateTTY>({
         jsonrpc: "2.0",
         id: crypto.randomUUID(),

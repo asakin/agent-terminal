@@ -23,6 +23,8 @@ export type RequestCreateTTY = JSONRPCRequestBase<"tty.create", {
     app?: string;
     args?: string[];
     cwd?: string;
+    cols: number;
+    rows: number;
 }>
 
 export type RequestAttachTTY = JSONRPCRequestBase<"tty.attach", {
