@@ -10,10 +10,8 @@
 </p>
 
 <p align="center">
-An integrated terminal in Chrome’s side panel. The shell, your files, and the agents already on your PATH.
+A local shell in Chrome’s side panel.
 </p>
-
-https://github.com/user-attachments/assets/4a35a440-5a95-40eb-a6b8-d0e51e34b9f6
 
 Each terminal is a local shell. An agent in that shell uses whatever browser tools it already has.
 
@@ -27,7 +25,7 @@ The side panel is a terminal next to the browser, in the same window.
 | --------------------------- | ------------------------------------------------ | ------------------------------------------ |
 | Where the terminal sits     | Chrome side panel, beside the page               | A separate app                             |
 | You stay in the loop        | Same window                                      | You switch away to watch a terminal        |
-| One-click agents            | Scripts in ~/.config/agent-terminal/apps         | Manual shells and PATH |
+| One-click agents            | Scripts in ~/.config/agent-terminal/apps         | Manual shells and PATH                     |
 
 ## Install
 

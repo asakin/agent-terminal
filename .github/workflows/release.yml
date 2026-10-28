@@ -24,13 +24,11 @@ jobs:
           node-version: "26"
           cache: "npm"
           cache-dependency-path: "extension/package-lock.json"
-      - name: Set VERSION env var
-        run: echo "VERSION=$(git describe --tags --abbrev=0 | sed 's/^v//')" >> $GITHUB_ENV
+      - name: Set manifest version
+        run: echo "MANIFEST_VERSION=$(git describe --tags --abbrev=0 | sed 's/^v//')" >> "$GITHUB_ENV"
       - name: Build extension
         run: npm ci && npm run build && npm run zip:firefox
         working-directory: extension
-        env:
-          MANIFEST_VERSION: ${{ env.VERSION }}
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
